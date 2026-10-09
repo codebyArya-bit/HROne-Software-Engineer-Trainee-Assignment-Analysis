@@ -1,0 +1,31 @@
+name: Test attendance API
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mongo-contract-tests:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd 'mongosh --quiet --eval "db.adminCommand({ping:1})"'
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      MONGO_URI: mongodb://127.0.0.1:27017
+      MONGO_DB: hrone_candidate_test_isolated
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m compileall -q app tests
+      - run: python -m pytest -q
