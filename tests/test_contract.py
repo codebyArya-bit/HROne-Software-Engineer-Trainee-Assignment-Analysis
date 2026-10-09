@@ -154,3 +154,24 @@ def test_analytics_ties_joiners_gaps_and_weekends(api):
     assert days[5]["is_working_day"] is False and days[5]["attendance_rate"] is None
     assert days[1]["attendance_rate"] == 0 and days[1]["moving_avg_7d"] == 0.375
     assert api.get("/analytics/departments/Engineering/trend", params={"from": "2026-07-01", "to": "2027-01-01"}).status_code == 422
+
+
+def test_all_explain_endpoints_indexed(api):
+    import json
+
+    for code in ("EMP0001", "EMP0002"):
+        assert api.post("/employees", json=employee(code)).status_code == 201
+    assert api.post("/attendance/punch-in", json={"emp_code": "EMP0001", "punched_at": ms(6, 10)}).status_code == 201
+    queries = [
+        ("attendance_list", {"emp_code": "EMP0001", "date_from": "2026-07-01", "date_to": "2026-07-31"}),
+        ("employee_monthly", {"emp_code": "EMP0001", "month": "2026-07"}),
+        ("department_summary", {"department": "Engineering", "month": "2026-07"}),
+        ("late_leaderboard", {"department": "Engineering", "month": "2026-07"}),
+        ("department_trend", {"department": "Engineering", "from": "2026-07-06", "to": "2026-07-08"}),
+    ]
+    for endpoint, params in queries:
+        response = api.get(f"/admin/explain/{endpoint}", params=params)
+        assert response.status_code == 200, (endpoint, response.text)
+        plan = json.dumps(response.json()["explain"])
+        assert '"IXSCAN"' in plan, (endpoint, "missing IXSCAN")
+        assert '"COLLSCAN"' not in plan, (endpoint, "unexpected COLLSCAN")
