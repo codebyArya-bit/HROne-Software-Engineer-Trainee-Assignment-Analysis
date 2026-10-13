@@ -86,6 +86,21 @@ def test_punch_business_rules_history_and_explain(api):
     assert "IXSCAN" in str(explanation.json()["explain"])
 
 
+def test_punch_out_before_or_equal_punch_in_returns_422(api):
+    assert api.post("/employees", json=employee("EMP0001")).status_code == 201
+    before = ms(6, 9, 29)
+    start = ms(6, 9, 30)
+    # With no attendance record, a punch-out is genuinely missing (404).
+    assert api.post("/attendance/punch-out", json={"emp_code": "EMP0001", "punched_at": before}).status_code == 404
+    assert api.post("/attendance/punch-in", json={"emp_code": "EMP0001", "punched_at": start}).status_code == 201
+    for invalid in (before, start):
+        response = api.post("/attendance/punch-out", json={"emp_code": "EMP0001", "punched_at": invalid})
+        assert response.status_code == 422, response.text
+    # A rejected invalid punch-out must not close the record.
+    valid = api.post("/attendance/punch-out", json={"emp_code": "EMP0001", "punched_at": ms(6, 18, 30)})
+    assert valid.status_code == 200, valid.text
+
+
 def test_half_day_overnight_and_invalid_ms(api):
     api.post("/employees", json=employee("EMP0001", start="22:00", end="06:00"))
     assert api.post("/attendance/punch-in", json={"emp_code": "EMP0001", "punched_at": ms(7, 2)}).json()["date"] == "2026-07-06"
