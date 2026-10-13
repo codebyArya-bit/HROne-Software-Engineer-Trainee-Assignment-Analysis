@@ -43,4 +43,4 @@ jobs:
       - name: Benchmark 100k attendance records and index plans
         env:
           MONGO_DB: hrone_perf_disposable
-        run: python tests/performance_smoke.py
+        run: PYTHONPATH=. python tests/performance_smoke.py
