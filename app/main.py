@@ -306,6 +306,12 @@ def punch_out(body: PunchOutIn):
     doc = db.attendance_logs.find_one({"emp_code": body.emp_code, "punch_in": {"$lte": instant}},
                                       sort=[("punch_in", -1)])
     if doc is None:
+        # Distinguish a missing punch-in (404) from an invalid earlier punch-out (422).
+        # Only this fallback query runs when no eligible punch-in exists.
+        latest = db.attendance_logs.find_one({"emp_code": body.emp_code},
+                                             sort=[("punch_in", -1)])
+        if latest is not None:
+            valid_duration(latest["punch_in"], instant)
         raise HTTPException(404, "no punch-in found")
     if doc.get("punch_out") is not None:
         raise HTTPException(409, "already punched out")
